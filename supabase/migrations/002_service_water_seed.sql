@@ -21,21 +21,24 @@ values
      'mawp_kg_cm2g',13,
      'suction_nozzle_nb',100,
      'discharge_nozzle_nb',65,
-     'source','Vendor pump documents'
+     'source','Vendor pump documents',
+     'verification_status','source-grounded'
    )),
-  ('line', 'SW-A1A-DEMO-001', 'Pump A Discharge Line', 'Illustrative line object pending approved line list.', 'draft',
+  ('line', 'SW-A1A-DEMO-001', 'Pump A Discharge Line', 'Illustrative line object pending approved line list.', 'inactive',
    jsonb_build_object(
      'piping_class','A1A',
      'source','PMS',
-     'data_quality','class-based; line tag illustrative'
+     'verification_status','pending approved line list',
+     'illustrative',true
    )),
-  ('valve', 'SW-VLV-DEMO-001', 'Pump A Isolation Valve', 'Illustrative valve object pending approved valve list.', 'draft',
+  ('valve', 'SW-VLV-DEMO-001', 'Pump A Isolation Valve', 'Illustrative valve object pending approved valve list.', 'inactive',
    jsonb_build_object(
      'vms_code','51301',
      'source','VMS',
-     'data_quality','specification-based; valve tag illustrative'
+     'verification_status','pending approved valve list',
+     'illustrative',true
    ))
-on conflict (tag) do update
+on conflict (object_type, tag) do update
 set name = excluded.name,
     description = excluded.description,
     status = excluded.status,
@@ -43,22 +46,22 @@ set name = excluded.name,
     updated_at = now();
 
 insert into public.engineering_relationships (source_object_id, target_object_id, relationship_type, metadata)
-select s.id, p.id, 'contains', '{}'::jsonb
-from public.engineering_objects s
-join public.engineering_objects p on p.tag = '501-P-0105A'
-where s.tag = 'SW-SYSTEM'
-on conflict do nothing;
-
-insert into public.engineering_relationships (source_object_id, target_object_id, relationship_type, metadata)
-select p.id, l.id, 'discharges_to', jsonb_build_object('verification','pending approved P&ID/line list')
+select p.id, s.id, 'part-of', '{}'::jsonb
 from public.engineering_objects p
-join public.engineering_objects l on l.tag = 'SW-A1A-DEMO-001'
-where p.tag = '501-P-0105A'
+join public.engineering_objects s on s.tag = 'SW-SYSTEM' and s.object_type = 'system'
+where p.tag = '501-P-0105A' and p.object_type = 'equipment'
 on conflict do nothing;
 
 insert into public.engineering_relationships (source_object_id, target_object_id, relationship_type, metadata)
-select l.id, v.id, 'contains', jsonb_build_object('verification','pending approved P&ID/valve list')
-from public.engineering_objects l
-join public.engineering_objects v on v.tag = 'SW-VLV-DEMO-001'
-where l.tag = 'SW-A1A-DEMO-001'
+select p.id, l.id, 'upstream-of', jsonb_build_object('verification','pending approved P&ID and line list')
+from public.engineering_objects p
+join public.engineering_objects l on l.tag = 'SW-A1A-DEMO-001' and l.object_type = 'line'
+where p.tag = '501-P-0105A' and p.object_type = 'equipment'
+on conflict do nothing;
+
+insert into public.engineering_relationships (source_object_id, target_object_id, relationship_type, metadata)
+select v.id, l.id, 'installed-on', jsonb_build_object('verification','pending approved P&ID and valve list')
+from public.engineering_objects v
+join public.engineering_objects l on l.tag = 'SW-A1A-DEMO-001' and l.object_type = 'line'
+where v.tag = 'SW-VLV-DEMO-001' and v.object_type = 'valve'
 on conflict do nothing;
